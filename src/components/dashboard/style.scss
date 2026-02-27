@@ -1,0 +1,239 @@
+// DashboardCard.scss - Shared styles for all dashboard widgets
+
+.dashboard-card {
+  position: relative;
+  display: flex;
+  gap: 16px;
+  padding: 24px;
+  background: var(--theme-elevation-0);
+  border: 1px solid var(--theme-elevation-150);
+  border-radius: 12px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--theme-success-500), var(--theme-success-400));
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  &:hover {
+    border-color: var(--theme-elevation-200);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    transform: translateY(-2px);
+
+    &::before {
+      opacity: 1;
+    }
+
+    .dashboard-card__icon {
+      transform: scale(1.05);
+      background: linear-gradient(135deg, var(--theme-success-500), var(--theme-success-400));
+    }
+  }
+
+  // Different colors for different card types
+  &--customers {
+    &::before {
+      background: linear-gradient(90deg, #6366f1, #8b5cf6);
+    }
+
+    .dashboard-card__icon {
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    }
+  }
+
+  &--products {
+    &::before {
+      background: linear-gradient(90deg, #f59e0b, #f97316);
+    }
+
+    .dashboard-card__icon {
+      background: linear-gradient(135deg, #f59e0b, #f97316);
+    }
+  }
+
+  &--revenue {
+    &::before {
+      background: linear-gradient(90deg, #10b981, #059669);
+    }
+
+    .dashboard-card__icon {
+      background: linear-gradient(135deg, #10b981, #059669);
+    }
+  }
+
+  &--orders {
+    &::before {
+      background: linear-gradient(90deg, #3b82f6, #2563eb);
+    }
+
+    .dashboard-card__icon {
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+    }
+  }
+
+  &__icon {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    background: linear-gradient(135deg, var(--theme-success-500), var(--theme-success-400));
+    border-radius: 12px;
+    color: white;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+
+    svg {
+      stroke-width: 2;
+    }
+  }
+
+  &__content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  &__label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--theme-elevation-500);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  &__value {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--theme-text);
+    line-height: 1.2;
+    margin: 4px 0;
+    background: linear-gradient(135deg, var(--theme-text), var(--theme-elevation-600));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  &__footer {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 8px;
+  }
+
+  &__badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: var(--theme-elevation-100);
+    border: 1px solid var(--theme-elevation-150);
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--theme-elevation-500);
+    transition: all 0.2s ease;
+
+    svg {
+      opacity: 0.6;
+    }
+
+    &--active {
+      background: var(--theme-success-100);
+      border-color: var(--theme-success-200);
+      color: var(--theme-success-700);
+
+      svg {
+        color: var(--theme-success-600);
+        opacity: 1;
+      }
+    }
+  }
+
+  &__trend {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all 0.2s ease;
+
+    &--up {
+      background: var(--theme-success-100);
+      color: var(--theme-success-700);
+
+      svg {
+        color: var(--theme-success-600);
+        transform: rotate(-45deg);
+      }
+    }
+
+    &--down {
+      background: var(--theme-error-100);
+      color: var(--theme-error-700);
+
+      svg {
+        color: var(--theme-error-600);
+        transform: rotate(-45deg);
+      }
+    }
+  }
+}
+
+// Dark mode adjustments
+@media (prefers-color-scheme: dark) {
+  .dashboard-card {
+    &__value {
+      -webkit-text-fill-color: var(--theme-text);
+      background: none;
+    }
+
+    &__icon {
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
+    }
+
+    &:hover {
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+  }
+}
+
+// Responsive
+@media (max-width: 768px) {
+  .dashboard-card {
+    padding: 20px;
+    gap: 12px;
+
+    &__icon {
+      width: 48px;
+      height: 48px;
+
+      svg {
+        width: 20px;
+        height: 20px;
+      }
+    }
+
+    &__value {
+      font-size: 28px;
+    }
+
+    &__footer {
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+  }
+}

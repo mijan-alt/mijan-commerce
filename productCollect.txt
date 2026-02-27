@@ -1,0 +1,304 @@
+import { CallToAction } from '@/blocks/CallToAction/config'
+import { Content } from '@/blocks/Content/config'
+import { MediaBlock } from '@/blocks/MediaBlock/config'
+import { generatePreviewPath } from '@/utilities/generatePreviewPath'
+import { generateUniqueSuffix } from '@/utilities/generateUniqueSuffix'
+import { CollectionOverride } from '@payloadcms/plugin-ecommerce/types'
+
+import {
+  MetaDescriptionField,
+  MetaImageField,
+  MetaTitleField,
+  OverviewField,
+  PreviewField,
+} from '@payloadcms/plugin-seo/fields'
+
+import {
+  FixedToolbarFeature,
+  HeadingFeature,
+  HorizontalRuleFeature,
+  InlineToolbarFeature,
+  lexicalEditor,
+} from '@payloadcms/richtext-lexical'
+
+import { DefaultDocumentIDType, Where } from 'payload'
+import { SITE_CONFIG } from 'site.config'
+
+export const ProductsCollection: CollectionOverride = ({ defaultCollection }) => ({
+  ...defaultCollection,
+
+  admin: {
+    ...defaultCollection?.admin,
+    useAsTitle: 'title',
+    defaultColumns: ['title', 'priceInNGN', 'onSale', '_status'],
+    livePreview: {
+      url: ({ data, req }) =>
+        generatePreviewPath({
+          slug: data?.slug,
+          collection: 'products',
+          req,
+        }),
+    },
+    preview: (data, { req }) =>
+      generatePreviewPath({
+        slug: data?.slug as string,
+        collection: 'products',
+        req,
+      }),
+  },
+
+  defaultPopulate: {
+    ...defaultCollection?.defaultPopulate,
+    title: true,
+    slug: true,
+    gallery: true,
+    priceInNGN: true,
+    salePriceInNGN: true,
+    inventory: true,
+    categories: true,
+    brand: true,
+    gender: true,
+  },
+
+  hooks: {
+    beforeValidate: [
+      ({ data }) => {
+        if (!data) return data
+
+        if (data.onSale && data.salePercentage && data.priceInNGN) {
+          const discount = (data.salePercentage / 100) * data.priceInNGN
+          data.salePriceInNGN = Math.round(data.priceInNGN - discount)
+        } else {
+          data.salePriceInNGN = null
+        }
+
+        return data
+      },
+    ],
+  },
+
+  fields: [
+    // ========================
+    // CORE
+    // ========================
+    {
+      name: 'title',
+      type: 'text',
+      required: true,
+    },
+
+    // ========================
+    // CONTENT TAB
+    // ========================
+    {
+      type: 'tabs',
+      tabs: [
+        {
+          label: 'Content',
+          fields: [
+            {
+              name: 'description',
+              type: 'richText',
+              editor: lexicalEditor({
+                features: ({ rootFeatures }) => [
+                  ...rootFeatures,
+                  HeadingFeature({ enabledHeadingSizes: ['h1', 'h2', 'h3', 'h4'] }),
+                  FixedToolbarFeature(),
+                  InlineToolbarFeature(),
+                  HorizontalRuleFeature(),
+                ],
+              }),
+            },
+            {
+              name: 'gallery',
+              type: 'array',
+              minRows: 1,
+              fields: [
+                {
+                  name: 'image',
+                  type: 'upload',
+                  relationTo: 'media',
+                  required: true,
+                },
+                {
+                  name: 'variantOption',
+                  type: 'relationship',
+                  relationTo: 'variantOptions',
+                  admin: {
+                    condition: (data) =>
+                      data?.enableVariants === true &&
+                      data?.variantTypes?.length > 0,
+                  },
+                  filterOptions: ({ data }) => {
+                    if (!data?.variantTypes?.length) {
+                      return { variantType: { in: [] } }
+                    }
+
+                    const ids = data.variantTypes.map((v: any) =>
+                      typeof v === 'object' ? v.id : v
+                    ) as DefaultDocumentIDType[]
+
+                    return { variantType: { in: ids } }
+                  },
+                },
+              ],
+            },
+            {
+              name: 'layout',
+              type: 'blocks',
+              blocks: [CallToAction, Content, MediaBlock],
+            },
+          ],
+        },
+
+        // ========================
+        // VARIANTS TAB
+        // ========================
+        {
+          label: 'Variants',
+          fields: [
+            ...defaultCollection.fields,
+            {
+              name: 'relatedProducts',
+              type: 'relationship',
+              relationTo: 'products',
+              hasMany: true,
+              filterOptions: ({ id }) =>
+                id
+                  ? { id: { not_in: [id] } }
+                  : { id: { exists: true } },
+            },
+          ],
+        },
+
+        // ========================
+        // SEO TAB
+        // ========================
+        {
+          name: 'meta',
+          label: 'SEO',
+          fields: [
+            OverviewField({
+              titlePath: 'meta.title',
+              descriptionPath: 'meta.description',
+              imagePath: 'meta.image',
+            }),
+            MetaTitleField({ hasGenerateFn: true }),
+            MetaImageField({ relationTo: 'media' }),
+            MetaDescriptionField({}),
+            PreviewField({
+              hasGenerateFn: true,
+              titlePath: 'meta.title',
+              descriptionPath: 'meta.description',
+            }),
+          ],
+        },
+      ],
+    },
+
+    // ========================
+    // SIDEBAR (COMMERCE CONTROL PANEL)
+    // ========================
+
+    {
+      type: 'collapsible',
+      label: 'Pricing',
+      admin: { position: 'sidebar', initCollapsed: false },
+      fields: [
+        // {
+        //   name: 'priceInNGN',
+        //   type: 'number',
+        //   required: true,
+        // },
+        {
+          name: 'onSale',
+          type: 'checkbox',
+          defaultValue: false,
+        },
+        {
+          name: 'salePercentage',
+          type: 'number',
+          min: 1,
+          max: 90,
+          admin: {
+            condition: (data) => Boolean(data?.onSale),
+          },
+        },
+        {
+          name: 'salePriceInNGN',
+          type: 'number',
+          admin: { readOnly: true },
+        },
+      ],
+    },
+
+    {
+      type: 'collapsible',
+      label: 'Organization',
+      admin: { position: 'sidebar' },
+      fields: [
+        {
+          name: 'categories',
+          type: 'relationship',
+          relationTo: 'categories',
+          hasMany: true,
+          required: true,
+        },
+        {
+          name: 'brand',
+          type: 'relationship',
+          relationTo: 'brands',
+          filterOptions: {
+            isActive: { equals: true },
+          },
+        },
+        {
+          name: 'gender',
+          type: 'select',
+          options: SITE_CONFIG.genderOptions,
+          defaultValue: SITE_CONFIG.singleGender || undefined,
+          admin: {
+            condition: () => !SITE_CONFIG.singleGender,
+          },
+        },
+      ],
+    },
+
+    {
+      name: 'slug',
+      type: 'text',
+      unique: true,
+      required: true,
+      admin: { position: 'sidebar' },
+      hooks: {
+        beforeValidate: [
+          async ({ data, operation, value, originalDoc }) => {
+            if (operation === 'update' && value === originalDoc?.slug) {
+              return value
+            }
+
+            if (!data?.title) return value
+
+            const baseSlug = data.title
+              .toLowerCase()
+              .replace(/ /g, '-')
+              .replace(/[^\w-]+/g, '')
+
+            const suffix = generateUniqueSuffix(8)
+            return `${baseSlug}-${suffix}`
+          },
+        ],
+      },
+    },
+
+    {
+      name: 'totalSales',
+      type: 'number',
+      defaultValue: 0,
+      admin: {
+        readOnly: true,
+        position: 'sidebar',
+      },
+    },
+  ],
+})

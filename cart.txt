@@ -1,0 +1,39 @@
+import { ecommercePlugin } from '@payloadcms/plugin-ecommerce'
+import type { CollectionConfig } from 'payload'
+
+export default buildConfig({
+  plugins: [
+    ecommercePlugin({
+      carts: {
+        cartsCollectionOverride: ({ defaultCollection }): CollectionConfig => ({
+          ...defaultCollection,
+          fields: defaultCollection.fields.map((field) => {
+            // Find the "items" array
+            if ('name' in field && field.name === 'items' && field.type === 'array') {
+              return {
+                ...field,
+                fields: [
+                  ...field.fields,
+
+                  // 👇 Add sale price snapshot
+                  {
+                    name: 'salePriceInNGN',
+                    type: 'number',
+                  },
+
+                  {
+                    name: 'onSale',
+                    type: 'checkbox',
+                    defaultValue: false,
+                  },
+                ],
+              }
+            }
+
+            return field
+          }),
+        }),
+      },
+    }),
+  ],
+})

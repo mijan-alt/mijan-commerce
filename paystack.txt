@@ -1,0 +1,536 @@
+// payments/paystack/index.ts
+import { PaymentAdapter } from '@payloadcms/plugin-ecommerce/types';
+import { confirmOrder } from './confirmOrder';
+import { initiatePayment } from './initiatePayment';
+import { webhooksEndpoint } from './webhooks';
+import type { GroupField } from 'payload';
+
+export interface PaystackAdapterArgs {
+  secretKey: string;
+  publicKey: string;
+  baseUrl?: string;
+  webhooks?: {
+    [eventType: string]: (args: {
+      event: any;
+      req: any;
+    }) => Promise<void> | void;
+  };
+  label?: string;
+  groupOverrides?: {
+    fields?: 
+      | ((args: { defaultFields: any[] }) => any[])
+      | any[];
+    admin?: any;
+    [key: string]: any;
+  };
+}
+
+export const paystackAdapter = (props: PaystackAdapterArgs): PaymentAdapter => {
+  const { 
+    secretKey, 
+    publicKey, 
+    baseUrl = 'https://api.paystack.co',
+    webhooks,
+    groupOverrides 
+  } = props;
+  
+  const label = props?.label || 'Paystack';
+
+  if (!secretKey) {
+    throw new Error('Paystack secret key is required');
+  }
+
+  if (!publicKey) {
+    throw new Error('Paystack public key is required');
+  }
+
+  // Define the default fields for the Paystack group
+  const baseFields = [
+    {
+      name: 'reference',
+      type: 'text' as const,
+      label: 'Paystack Reference',
+      admin: {
+        readOnly: true
+      }
+    },
+    {
+      name: 'transactionId',
+      type: 'number' as const,
+      label: 'Paystack Transaction ID',
+      admin: {
+        readOnly: true
+      }
+    },
+    {
+      name: 'authorizationCode',
+      type: 'text' as const,
+      label: 'Authorization Code',
+      admin: {
+        readOnly: true
+      }
+    },
+    {
+      name: 'accessCode',
+      type: 'text' as const,
+      label: 'Access Code',
+      admin: {
+        readOnly: true
+      }
+    },
+    {
+      name: 'customerCode',
+      type: 'text' as const,
+      label: 'Customer Code',
+      admin: {
+        readOnly: true
+      }
+    }
+  ];
+
+  // Build the group field with conditional display
+  const groupField: GroupField = {
+    name: 'paystack',
+    type: 'group',
+    admin: {
+      condition: (data: any) => {
+        return data?.paymentMethod === 'paystack';
+      },
+      ...groupOverrides?.admin
+    },
+    fields: groupOverrides?.fields && typeof groupOverrides?.fields === 'function' 
+      ? groupOverrides.fields({
+          defaultFields: baseFields
+        }) 
+      : [
+          ...baseFields,
+          ...(Array.isArray(groupOverrides?.fields) ? groupOverrides.fields : [])
+        ]
+  };
+
+  // Create endpoints array with webhooks
+  const endpoints = [
+    webhooksEndpoint({
+      secretKey,
+      baseUrl,
+      webhooks
+    })
+  ];
+
+  return {
+    name: 'paystack',
+    label,
+    group: groupField,
+    initiatePayment: initiatePayment({
+      secretKey,
+      publicKey,
+      baseUrl
+    }),
+    confirmOrder: confirmOrder({
+      secretKey,
+      baseUrl
+    }),
+    endpoints
+  };
+};
+
+// Client-side adapter configuration
+export interface PaystackAdapterClientArgs {
+  publicKey: string;
+  label?: string;
+}
+
+export const paystackAdapterClient = (props: PaystackAdapterClientArgs) => {
+  const { publicKey, label } = props;
+
+  if (!publicKey) {
+    throw new Error('Paystack public key is required');
+  }
+
+  return {
+    name: 'paystack',
+    label: label || 'Paystack',
+    initiatePayment: true,
+    confirmOrder: true,
+    publicKey // Pass public key to frontend
+  };
+};
+
+// payments/paystack/initiatePayment.ts
+import axios from 'axios';
+import type { PaymentAdapter } from '@payloadcms/plugin-ecommerce/types';
+
+export const initiatePayment = (props: {
+  secretKey: string;
+  publicKey: string;
+  baseUrl?: string;
+}): NonNullable<PaymentAdapter>['initiatePayment'] => {
+  return async ({ data, req, transactionsSlug }) => {
+    const payload = req.payload;
+    const { secretKey, publicKey, baseUrl = 'https://api.paystack.co' } = props;
+
+    // Extract required data
+    const customerEmail = data.customerEmail;
+    const currency = data.currency;
+    const cart = data.cart;
+    const amount = cart.total;
+    const billingAddressFromData = data.billingAddress;
+    const shippingAddressFromData = data.shippingAddress;
+
+    // Validate required fields
+    if (!currency) {
+      throw new Error('Currency is required.');
+    }
+
+    if (currency !== 'NGN') {
+      throw new Error('Paystack only supports NGN currency.');
+    }
+
+    if (!cart || !cart.items || cart.items.length === 0) {
+      throw new Error('Cart is empty or not provided.');
+    }
+
+    if (!customerEmail || typeof customerEmail !== 'string') {
+      throw new Error('A valid customer email is required to make a purchase.');
+    }
+
+    if (!amount || typeof amount !== 'number' || amount <= 0) {
+      throw new Error('A valid amount is required to initiate a payment.');
+    }
+
+    try {
+      // Calculate amount in kobo (smallest currency unit for NGN)
+      const amountInKobo = Math.round(amount * 100);
+
+      // Flatten cart items for metadata
+      const flattenedCart = cart.items.map((item: any) => {
+        const productID = typeof item.product === 'object' ? item.product.id : item.product;
+        const variantID = item.variant 
+          ? (typeof item.variant === 'object' ? item.variant.id : item.variant) 
+          : undefined;
+        
+        return {
+          product: productID,
+          quantity: item.quantity,
+          variant: variantID
+        };
+      });
+
+      // Prepare addresses for metadata
+      const shippingAddress = shippingAddressFromData || billingAddressFromData;
+      const shippingAddressAsString = JSON.stringify(shippingAddress);
+      const billingAddressAsString = JSON.stringify(billingAddressFromData);
+
+      // Initialize Paystack transaction
+      const response = await axios.post(
+        `${baseUrl}/transaction/initialize`,
+        {
+          email: customerEmail,
+          amount: amountInKobo,
+          currency: 'NGN',
+          callback_url: `${process.env.PAYLOAD_PUBLIC_SERVER_URL}/api/payments/paystack/callback`,
+          metadata: {
+            cartID: cart.id,
+            cartItemsSnapshot: JSON.stringify(flattenedCart),
+            shippingAddress: shippingAddressAsString,
+            billingAddress: billingAddressAsString,
+            cancel_action: `${process.env.PAYLOAD_PUBLIC_SERVER_URL}/checkout`
+          },
+          channels: ['card', 'bank', 'ussd', 'qr', 'mobile_money', 'bank_transfer']
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${secretKey}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      const paystackData = response.data.data;
+
+      if (!paystackData.reference) {
+        throw new Error('Failed to initialize Paystack transaction');
+      }
+
+      // Create a transaction record in the database
+      const transaction = await payload.create({
+        collection: transactionsSlug,
+        data: {
+          ...(req.user ? {
+            customer: req.user.id
+          } : {
+            customerEmail
+          }),
+          amount: amount,
+          billingAddress: billingAddressFromData,
+          shippingAddress: shippingAddress,
+          cart: cart.id,
+          currency: currency.toUpperCase(),
+          items: flattenedCart,
+          paymentMethod: 'paystack',
+          status: 'pending',
+          paystack: {
+            reference: paystackData.reference,
+            transactionId: paystackData.id,
+            accessCode: paystackData.access_code
+          }
+        }
+      });
+
+      // Return data for inline checkout
+      return {
+        // Essential data for Paystack inline popup
+        publicKey: publicKey,
+        email: customerEmail,
+        amount: amountInKobo,
+        reference: paystackData.reference,
+        accessCode: paystackData.access_code,
+        
+        // Fallback authorization URL for redirect mode
+        authorizationUrl: paystackData.authorization_url,
+        
+        // Transaction tracking
+        transactionId: transaction.id,
+        
+        // Additional metadata
+        metadata: {
+          cartID: cart.id,
+          custom_fields: [
+            {
+              display_name: "Cart ID",
+              variable_name: "cart_id",
+              value: cart.id
+            }
+          ]
+        },
+        
+        message: 'Payment initiated successfully',
+        mode: 'inline'
+      };
+    } catch (error: any) {
+      payload.logger.error(error, 'Error initiating payment with Paystack');
+      
+      throw new Error(
+        error.response?.data?.message || 
+        error.message || 
+        'Unknown error initiating payment with Paystack'
+      );
+    }
+  };
+};
+
+// payments/paystack/confirmOrder.ts
+import axios from 'axios';
+import type { PaymentAdapter } from '@payloadcms/plugin-ecommerce/types';
+
+export const confirmOrder = (props: {
+  secretKey: string;
+  baseUrl?: string;
+}): NonNullable<PaymentAdapter>['confirmOrder'] => {
+  return async ({ 
+    data, 
+    ordersSlug = 'orders', 
+    req, 
+    transactionsSlug = 'transactions' 
+  }) => {
+    const payload = req.payload;
+    const { secretKey, baseUrl = 'https://api.paystack.co' } = props;
+    
+    const customerEmail = data.customerEmail;
+    const reference = data.reference;
+
+    if (!reference) {
+      throw new Error('Payment reference is required');
+    }
+
+    try {
+      // Verify the transaction with Paystack
+      const verifyResponse = await axios.get(
+        `${baseUrl}/transaction/verify/${reference}`,
+        {
+          headers: {
+            Authorization: `Bearer ${secretKey}`,
+          },
+        }
+      );
+
+      const paystackTransaction = verifyResponse.data.data;
+
+      // Check payment status
+      if (paystackTransaction.status !== 'success') {
+        throw new Error(`Payment not successful: ${paystackTransaction.status}`);
+      }
+
+      // Find existing transaction by reference
+      const transactionsResults = await payload.find({
+        collection: transactionsSlug,
+        where: {
+          'paystack.reference': {
+            equals: reference
+          }
+        }
+      });
+
+      const transaction = transactionsResults.docs[0];
+
+      if (!transactionsResults.totalDocs || !transaction) {
+        throw new Error('No transaction found for the provided reference');
+      }
+
+      // Extract metadata from Paystack transaction
+      const cartID = paystackTransaction.metadata?.cartID;
+      const cartItemsSnapshot = paystackTransaction.metadata?.cartItemsSnapshot 
+        ? JSON.parse(paystackTransaction.metadata.cartItemsSnapshot) 
+        : undefined;
+      const shippingAddress = paystackTransaction.metadata?.shippingAddress 
+        ? JSON.parse(paystackTransaction.metadata.shippingAddress) 
+        : undefined;
+      const billingAddress = paystackTransaction.metadata?.billingAddress 
+        ? JSON.parse(paystackTransaction.metadata.billingAddress) 
+        : undefined;
+
+      if (!cartID) {
+        throw new Error('Cart ID not found in the Paystack transaction metadata');
+      }
+
+      if (!cartItemsSnapshot || !Array.isArray(cartItemsSnapshot)) {
+        throw new Error('Cart items snapshot not found or invalid in the Paystack transaction metadata');
+      }
+
+      // Create the order in the database
+      const order = await payload.create({
+        collection: ordersSlug,
+        data: {
+          total: paystackTransaction.amount / 100, // Convert from kobo to naira
+          currency: paystackTransaction.currency.toUpperCase(),
+          ...(req.user ? {
+            customer: req.user.id
+          } : {
+            customerEmail
+          }),
+          items: cartItemsSnapshot,
+          shippingAddress: shippingAddress || billingAddress,
+          billingAddress: billingAddress,
+          status: 'processing',
+          payment: transaction.id
+        }
+      });
+
+      const timestamp = new Date().toISOString();
+
+      // Update the cart to mark it as purchased
+      await payload.update({
+        id: cartID,
+        collection: 'carts',
+        data: {
+          purchasedAt: timestamp
+        }
+      });
+
+      // Update the transaction with order info and mark as succeeded
+      await payload.update({
+        id: transaction.id,
+        collection: transactionsSlug,
+        data: {
+          order: order.id,
+          status: 'succeeded',
+          paystack: {
+            ...transaction.paystack,
+            transactionId: paystackTransaction.id,
+            authorizationCode: paystackTransaction.authorization?.authorization_code,
+            customerCode: paystackTransaction.customer?.customer_code,
+          }
+        }
+      });
+
+      return {
+        message: 'Order confirmed successfully',
+        orderID: order.id,
+        transactionID: transaction.id
+      };
+    } catch (error: any) {
+      payload.logger.error(error, 'Error confirming order with Paystack');
+      
+      throw new Error(
+        error.response?.data?.message || 
+        error.message || 
+        'Unknown error confirming order with Paystack'
+      );
+    }
+  };
+};
+
+// payments/paystack/webhooks.ts
+import type { Endpoint } from 'payload';
+import crypto from 'crypto';
+
+export const webhooksEndpoint = (props: {
+  secretKey: string;
+  baseUrl?: string;
+  webhooks?: {
+    [eventType: string]: (args: {
+      event: any;
+      req: any;
+    }) => Promise<void> | void;
+  };
+}): Endpoint => {
+  const { secretKey, webhooks } = props;
+
+  return {
+    method: 'post',
+    path: '/webhooks',
+    handler: async (req) => {
+      let returnStatus = 200;
+
+      try {
+        const body = await req.text();
+        const paystackSignature = req.headers.get('x-paystack-signature');
+
+        if (!paystackSignature) {
+          req.payload.logger.error('Missing Paystack signature header');
+          return Response.json(
+            { received: false, error: 'Missing signature' },
+            { status: 401 }
+          );
+        }
+
+        // Verify webhook signature
+        const hash = crypto
+          .createHmac('sha512', secretKey)
+          .update(body)
+          .digest('hex');
+
+        if (hash !== paystackSignature) {
+          req.payload.logger.error('Invalid Paystack webhook signature');
+          return Response.json(
+            { received: false, error: 'Invalid signature' },
+            { status: 401 }
+          );
+        }
+
+        // Signature is valid, process the event
+        const event = JSON.parse(body);
+
+        if (typeof webhooks === 'object' && event) {
+          const webhookEventHandler = webhooks[event.event];
+          
+          if (typeof webhookEventHandler === 'function') {
+            await webhookEventHandler({
+              event,
+              req
+            });
+          }
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : JSON.stringify(err);
+        req.payload.logger.error(`Error processing Paystack webhook: ${msg}`);
+        returnStatus = 400;
+      }
+
+      return Response.json(
+        { received: true },
+        { status: returnStatus }
+      );
+    }
+  };
+};

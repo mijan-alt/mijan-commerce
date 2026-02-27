@@ -8,6 +8,8 @@ import { Providers } from '@/providers'
 import { InitTheme } from '@/providers/Theme/InitTheme'
 import { GeistMono } from 'geist/font/mono'
 import { GeistSans } from 'geist/font/sans'
+import { WhatsAppButtonWrapper } from '@/components/Whatsapp/WhatsAppButtonWrapper'
+import { Suspense } from 'react'
 import './globals.css'
 
 /* const { SITE_NAME, TWITTER_CREATOR, TWITTER_SITE } = process.env
@@ -58,6 +60,9 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             {children}
             <Footer />
           </main>
+            <Suspense fallback={null}>
+            <WhatsAppButtonWrapper />
+          </Suspense>
         </Providers>
       </body>
     </html>

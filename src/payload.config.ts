@@ -7,6 +7,7 @@ import { Users } from '@/collections/Users'
 import { Footer } from '@/globals/Footer'
 import { Header } from '@/globals/Header'
 import { nodemailerAdapter } from '@payloadcms/email-nodemailer'
+import { Settings } from '@/globals/Settings'
 
 import {
   BoldFeature,
@@ -69,6 +70,7 @@ export default buildConfig({
     user: Users.slug,
   },
   collections: [Users, Pages, Media, Brands, Categories, Col, Blogs],
+ 
   db: mongooseAdapter({
     url: process.env.DATABASE_URL || '',
   }),
@@ -121,7 +123,7 @@ export default buildConfig({
     },
   }),
   endpoints: [],
-  globals: [Header, Footer],
+  globals: [Header, Footer, Settings],
   plugins,
   secret: process.env.PAYLOAD_SECRET || '',
   typescript: {

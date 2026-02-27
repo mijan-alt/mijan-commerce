@@ -12,12 +12,12 @@ import { useCurrency } from '@payloadcms/plugin-ecommerce/client/react'
 import { Heart } from 'lucide-react'
 import { ShareProductButton } from './ShareProductButton'
 import { VariantSelector } from './VariantSelector'
+import { WhatsAppEnquiry } from '../Whatsapp/WhatsappEnquiry'
 
-export function ProductDescription({ product }: { product: Product }) {
+export function ProductDescription({ product  , whatsappNumber,}: { product: Product, whatsappNumber: string | null }) {
   const { currency } = useCurrency()
+ const productUrl = `${process.env.NEXT_PUBLIC_SERVER_URL}/products/${product.slug}`
 
-  console.log('ProductDescription render', { product })
-  console.log('Currency from context:', currency)
 
   let amount = 0,
     lowestAmount = 0,
@@ -134,6 +134,14 @@ export function ProductDescription({ product }: { product: Product }) {
         <Suspense fallback={<div>loading</div>}>
           <AddToCart product={product} />
         </Suspense>
+
+          {whatsappNumber && (
+    <WhatsAppEnquiry
+      productTitle={product.title}
+      productUrl={productUrl}
+      phoneNumber={whatsappNumber}
+    />
+  )}
 
         <div className="flex gap-3">
           <Button variant="outline" size="lg" className="flex-1">

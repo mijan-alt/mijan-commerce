@@ -137,10 +137,12 @@ export interface Config {
   globals: {
     header: Header;
     footer: Footer;
+    settings: Setting;
   };
   globalsSelect: {
     header: HeaderSelect<false> | HeaderSelect<true>;
     footer: FooterSelect<false> | FooterSelect<true>;
+    settings: SettingsSelect<false> | SettingsSelect<true>;
   };
   locale: null;
   user: User;
@@ -2473,6 +2475,35 @@ export interface Footer {
   createdAt?: string | null;
 }
 /**
+ * Global site settings — WhatsApp, announcements, and more.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "settings".
+ */
+export interface Setting {
+  id: string;
+  whatsapp?: {
+    /**
+     * Toggle the floating WhatsApp button site wide
+     */
+    enabled?: boolean | null;
+    /**
+     * Include country code, no spaces or dashes. e.g. 2348012345678
+     */
+    phoneNumber?: string | null;
+    /**
+     * Default message that appears in WhatsApp when customer clicks the button
+     */
+    message?: string | null;
+    /**
+     * Text shown on hover
+     */
+    tooltipText?: string | null;
+  };
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "header_select".
  */
@@ -2546,6 +2577,23 @@ export interface FooterSelect<T extends boolean = true> {
     | {
         copyrightText?: T;
         tagline?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "settings_select".
+ */
+export interface SettingsSelect<T extends boolean = true> {
+  whatsapp?:
+    | T
+    | {
+        enabled?: T;
+        phoneNumber?: T;
+        message?: T;
+        tooltipText?: T;
       };
   updatedAt?: T;
   createdAt?: T;

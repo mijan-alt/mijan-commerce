@@ -1,10 +1,11 @@
 import type { Media, Product } from '@/payload-types'
 
+import { ProductCard } from '@/blocks/ProductCarousel/ProductCard'
 import { RenderBlocks } from '@/blocks/RenderBlocks'
-import { GridTileImage } from '@/components/Grid/tile'
 import { Gallery } from '@/components/product/Gallery'
 import { ProductDescription } from '@/components/product/ProductDescription'
 import { Button } from '@/components/ui/button'
+import { getSettings } from '@/utilities/getSettings'
 import configPromise from '@payload-config'
 import { ChevronLeftIcon } from 'lucide-react'
 import { Metadata } from 'next'
@@ -13,7 +14,6 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getPayload } from 'payload'
 import React, { Suspense } from 'react'
-import { ProductCard } from '@/blocks/ProductCarousel/ProductCard'
 
 type Args = {
   params: Promise<{
@@ -63,6 +63,9 @@ export async function generateMetadata({ params }: Args): Promise<Metadata> {
 export default async function ProductPage({ params }: Args) {
   const { slug } = await params
   const product = await queryProductBySlug({ slug })
+
+  const settings = await getSettings()
+  const whatsappNumber = settings?.whatsapp?.phoneNumber
 
   console.log('product details', product)
 
@@ -131,7 +134,7 @@ export default async function ProductPage({ params }: Args) {
 
         {/* Mobile Content */}
         <div className="container py-6">
-          <ProductDescription product={product} />
+          <ProductDescription product={product}  whatsappNumber={whatsappNumber || null} />
         </div>
       </div>
 
@@ -159,7 +162,7 @@ export default async function ProductPage({ params }: Args) {
 
             {/* Product info */}
             <div className="w-full max-w-md">
-              <ProductDescription product={product} />
+              <ProductDescription product={product} whatsappNumber={whatsappNumber || null}/>
             </div>
           </div>
         </div>
@@ -187,7 +190,7 @@ function RelatedProducts({ products }: { products: Product[] }) {
       <ul className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
         {products.map((product) => (
           <li key={product.id}>
-               <ProductCard product={product} />
+            <ProductCard product={product} />
           </li>
         ))}
       </ul>

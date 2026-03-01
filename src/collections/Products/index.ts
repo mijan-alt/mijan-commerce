@@ -2,11 +2,9 @@ import { CallToAction } from '@/blocks/CallToAction/config'
 import { Content } from '@/blocks/Content/config'
 import { MediaBlock } from '@/blocks/MediaBlock/config'
 import { generatePreviewPath } from '@/utilities/generatePreviewPath'
-
 import { generateUniqueSuffix } from '@/utilities/generateUniqueSuffix'
 import { CollectionOverride } from '@payloadcms/plugin-ecommerce/types'
 import { revalidatePath } from 'next/cache'
-
 import {
   MetaDescriptionField,
   MetaImageField,
@@ -14,7 +12,6 @@ import {
   OverviewField,
   PreviewField,
 } from '@payloadcms/plugin-seo/fields'
-
 import {
   FixedToolbarFeature,
   HeadingFeature,
@@ -22,339 +19,728 @@ import {
   InlineToolbarFeature,
   lexicalEditor,
 } from '@payloadcms/richtext-lexical'
-
 import { DefaultDocumentIDType, Where } from 'payload'
 import { SITE_CONFIG } from 'site.config'
 
-export const ProductsCollection: CollectionOverride = ({ defaultCollection }) => ({
-  ...defaultCollection,
+export const ProductsCollection: CollectionOverride = ({ defaultCollection }) => {
+  // ═══════════════════════════════════════════════════════════
+  // MODIFY PLUGIN'S PRICING GROUP
+  // - Move to sidebar
+  // - Set priceInNGNEnabled to default true
+  // ═══════════════════════════════════════════════════════════
+  const modifiedDefaultFields = defaultCollection.fields.map((field: any) => {
+    if (field.type === 'group' && !field.name) {
+      return {
+        ...field,
+        admin: {
+          ...field.admin,
+          position: 'sidebar',
+        },
+        fields: field.fields.map((innerField: any) => {
+          if (innerField.type === 'row') {
+            return {
+              ...innerField,
+              fields: innerField.fields.map((rowField: any) => {
+                if (rowField.name === 'priceInNGNEnabled') {
+                  return { ...rowField, defaultValue: true }
+                }
+                return rowField
+              }),
+            }
+          }
+          return innerField
+        }),
+      }
+    }
+    return field
+  })
 
-  admin: {
-    ...defaultCollection?.admin,
-    useAsTitle: 'title',
-    defaultColumns: ['title', 'priceInNGN', 'onSale', '_status'],
-    livePreview: {
-      url: ({ data, req }) =>
+  // Safe to spread in tabs — no pricing group duplication
+  const defaultFieldsWithoutPricingGroup = modifiedDefaultFields.filter(
+    (f: any) => !(f.type === 'group' && !f.name),
+  )
+
+  // Extract pricing row fields to inject into our Pricing collapsible
+  const pricingGroupFields =
+    modifiedDefaultFields.find((f: any) => f.type === 'group' && !f.name)?.fields ?? []
+
+  return {
+    ...defaultCollection,
+
+    // ═══════════════════════════════════════════════════════════
+    // ADMIN
+    // ═══════════════════════════════════════════════════════════
+    admin: {
+      ...defaultCollection?.admin,
+      useAsTitle: 'title',
+      defaultColumns: ['title', 'priceInNGN', 'onSale', '_status'],
+      livePreview: {
+        url: ({ data, req }) =>
+          generatePreviewPath({
+            slug: data?.slug,
+            collection: 'products',
+            req,
+          }),
+      },
+      preview: (data, { req }) =>
         generatePreviewPath({
-          slug: data?.slug,
+          slug: data?.slug as string,
           collection: 'products',
           req,
         }),
     },
-    preview: (data, { req }) =>
-      generatePreviewPath({
-        slug: data?.slug as string,
-        collection: 'products',
-        req,
-      }),
-  },
 
-  defaultPopulate: {
-    ...defaultCollection?.defaultPopulate,
-    title: true,
-    slug: true,
-    gallery: true,
-    priceInNGN: true,
-    salePriceInNGN: true,
-    inventory: true,
-    categories: true,
-    brand: true,
-    gender: true,
-    onSale:true
-  },
-
-  hooks: {
-    beforeValidate: [
-      ({ data }) => {
-        if (!data) return data
-
-        if (data.onSale && data.salePercentage && data.priceInNGN) {
-          const discount = (data.salePercentage / 100) * data.priceInNGN
-          data.salePriceInNGN = Math.round(data.priceInNGN - discount)
-        } else {
-          data.salePriceInNGN = null
-        }
-
-        return data
-      },
-    ],
-
-    afterChange: [
-      ({ doc, previousDoc, operation }) => {
-        // Revalidate the specific product page
-        if (operation === 'update') {
-          revalidatePath(`/products/${doc.slug}`)
-        }
-
-        return doc
-      },
-    ],
-  },
-
-  fields: [
-    // ========================
-    // CORE
-    // ========================
-    {
-      name: 'title',
-      type: 'text',
-      required: true,
+    // ═══════════════════════════════════════════════════════════
+    // DEFAULT POPULATE
+    // ═══════════════════════════════════════════════════════════
+    defaultPopulate: {
+      ...defaultCollection?.defaultPopulate,
+      title: true,
+      slug: true,
+      gallery: true,
+      priceInNGN: true,
+      salePriceInNGN: true,
+      inventory: true,
+      categories: true,
+      brand: true,
+      gender: true,
+      onSale: true,
     },
 
-    // ========================
-    // CONTENT TAB
-    // ========================
-    {
-      type: 'tabs',
-      tabs: [
-        {
-          label: 'Content',
-          fields: [
-            {
-              name: 'description',
-              type: 'richText',
-              editor: lexicalEditor({
-                features: ({ rootFeatures }) => [
-                  ...rootFeatures,
-                  HeadingFeature({ enabledHeadingSizes: ['h1', 'h2', 'h3', 'h4'] }),
-                  FixedToolbarFeature(),
-                  InlineToolbarFeature(),
-                  HorizontalRuleFeature(),
-                ],
-              }),
-            },
-            {
-              name: 'gallery',
-              type: 'array',
-              minRows: 1,
-              fields: [
-                {
-                  name: 'image',
-                  type: 'upload',
-                  relationTo: 'media',
-                  required: true,
-                },
+    // ═══════════════════════════════════════════════════════════
+    // HOOKS
+    // ═══════════════════════════════════════════════════════════
+    hooks: {
+      beforeValidate: [
+        ({ data }) => {
+          if (!data) return data
 
-                {
-                  name: 'variantOption',
-                  type: 'relationship',
-                  relationTo: 'variantOptions',
-                  admin: {
-                    condition: (data) => {
-                      return data?.enableVariants === true && data?.variantTypes?.length > 0
-                    },
-                  },
-                  filterOptions: ({ data }) => {
-                    if (data?.enableVariants && data?.variantTypes?.length) {
-                      const variantTypeIDs = data.variantTypes.map((item: any) => {
-                        if (typeof item === 'object' && item?.id) {
-                          return item.id
-                        }
-                        return item
-                      }) as DefaultDocumentIDType[]
+          if (data.onSale && data.salePercentage && data.priceInNGN) {
+            const discount = (data.salePercentage / 100) * data.priceInNGN
+            data.salePriceInNGN = Math.round(data.priceInNGN - discount)
+          } else {
+            data.salePriceInNGN = null
+          }
 
-                      if (variantTypeIDs.length === 0)
-                        return {
-                          variantType: {
-                            in: [],
-                          },
-                        }
-
-                      const query: Where = {
-                        variantType: {
-                          in: variantTypeIDs,
-                        },
-                      }
-
-                      return query
-                    }
-
-                    return {
-                      variantType: {
-                        in: [],
-                      },
-                    }
-                  },
-                },
-              ],
-            },
-            {
-              name: 'layout',
-              type: 'blocks',
-              blocks: [CallToAction, Content, MediaBlock],
-            },
-          ],
+          return data
         },
+      ],
 
-        // ========================
-        // VARIANTS TAB
-        // ========================
-        {
-          label: 'Related Products',
-          fields: [
-            ...defaultCollection.fields,
-            {
-              name: 'relatedProducts',
-              type: 'relationship',
-              filterOptions: ({ id }) => {
-                if (id) {
-                  return {
-                    id: {
-                      not_in: [id],
-                    },
-                  }
-                }
+      afterChange: [
+        ({ doc, previousDoc, operation }) => {
+        
 
-                // ID comes back as undefined during seeding so we need to handle that case
-                return {
-                  id: {
-                    exists: true,
-                  },
-                }
+          if (operation === 'update' && previousDoc?.slug && previousDoc.slug !== doc.slug) {
+            revalidatePath(`/products/${previousDoc.slug}`)
+          }
+
+          // if (doc.onSale !== previousDoc?.onSale) {
+          //   revalidatePath('/shop/on-sale')
+          // }
+
+       
+
+          return doc
+        },
+      ],
+    },
+
+    // ═══════════════════════════════════════════════════════════
+    // FIELDS
+    // ═══════════════════════════════════════════════════════════
+    fields: [
+      // ── Title ────────────────────────────────────────────────
+      {
+        name: 'title',
+        type: 'text',
+        required: true,
+      },
+
+      // ── Tabs ─────────────────────────────────────────────────
+      {
+        type: 'tabs',
+        tabs: [
+          // Content Tab
+          {
+            label: 'Content',
+            fields: [
+              {
+                name: 'description',
+                type: 'richText',
+                editor: lexicalEditor({
+                  features: ({ rootFeatures }) => [
+                    ...rootFeatures,
+                    HeadingFeature({ enabledHeadingSizes: ['h1', 'h2', 'h3', 'h4'] }),
+                    FixedToolbarFeature(),
+                    InlineToolbarFeature(),
+                    HorizontalRuleFeature(),
+                  ],
+                }),
               },
-              hasMany: true,
-              relationTo: 'products',
-            },
-          ],
-        },
+              {
+                name: 'gallery',
+                type: 'array',
+                minRows: 1,
+                fields: [
+                  {
+                    name: 'image',
+                    type: 'upload',
+                    relationTo: 'media',
+                    required: true,
+                  },
+                  {
+                    name: 'variantOption',
+                    type: 'relationship',
+                    relationTo: 'variantOptions',
+                    admin: {
+                      condition: (data) => {
+                        return data?.enableVariants === true && data?.variantTypes?.length > 0
+                      },
+                    },
+                    filterOptions: ({ data }) => {
+                      if (data?.enableVariants && data?.variantTypes?.length) {
+                        const variantTypeIDs = data.variantTypes.map((item: any) => {
+                          if (typeof item === 'object' && item?.id) return item.id
+                          return item
+                        }) as DefaultDocumentIDType[]
 
-        // ========================
-        // SEO TAB
-        // ========================
-        {
-          name: 'meta',
-          label: 'SEO',
-          fields: [
-            OverviewField({
-              titlePath: 'meta.title',
-              descriptionPath: 'meta.description',
-              imagePath: 'meta.image',
-            }),
-            MetaTitleField({ hasGenerateFn: true }),
-            MetaImageField({ relationTo: 'media' }),
-            MetaDescriptionField({}),
-            PreviewField({
-              hasGenerateFn: true,
-              titlePath: 'meta.title',
-              descriptionPath: 'meta.description',
-            }),
-          ],
-        },
-      ],
-    },
+                        if (variantTypeIDs.length === 0) return { variantType: { in: [] } }
 
-    // ========================
-    // SIDEBAR (COMMERCE CONTROL PANEL)
-    // ========================
-
-    {
-      type: 'collapsible',
-      label: 'Pricing',
-      admin: { position: 'sidebar', initCollapsed: false },
-      fields: [
-    
-        {
-          name: 'onSale',
-          type: 'checkbox',
-          defaultValue: false,
-        },
-        {
-          name: 'salePercentage',
-          type: 'number',
-          min: 1,
-          max: 90,
-          admin: {
-            condition: (data) => Boolean(data?.onSale),
+                        const query: Where = { variantType: { in: variantTypeIDs } }
+                        return query
+                      }
+                      return { variantType: { in: [] } }
+                    },
+                  },
+                ],
+              },
+              {
+                name: 'layout',
+                type: 'blocks',
+                blocks: [CallToAction, Content, MediaBlock],
+              },
+            ],
           },
-        },
-        {
-          name: 'salePriceInNGN',
-          type: 'number',
-          admin: { readOnly: true },
-        },
-      ],
-    },
 
-    {
-      type: 'collapsible',
-      label: 'Organization',
-      admin: { position: 'sidebar' },
-      fields: [
-        {
-          name: 'categories',
-          type: 'relationship',
-          relationTo: 'categories',
-          hasMany: true,
-          required: true,
-        },
-        {
-          name: 'brand',
-          type: 'relationship',
-          relationTo: 'brands',
-          filterOptions: {
-            isActive: { equals: true },
+          // Related Products Tab
+          {
+            label: 'Related Products',
+            fields: [
+              // Spread without pricing group to avoid DuplicateFieldName
+              ...defaultFieldsWithoutPricingGroup,
+              {
+                name: 'relatedProducts',
+                type: 'relationship',
+                filterOptions: ({ id }) => {
+                  if (id) return { id: { not_in: [id] } }
+                  return { id: { exists: true } }
+                },
+                hasMany: true,
+                relationTo: 'products',
+              },
+            ],
           },
-        },
-        {
-          name: 'gender',
-          type: 'select',
-          options: SITE_CONFIG.genderOptions,
-          defaultValue: SITE_CONFIG.singleGender || undefined,
-          admin: {
-            condition: () => !SITE_CONFIG.singleGender,
-          },
-        },
-      ],
-    },
 
-    {
-      name: 'slug',
-      type: 'text',
-      required: true,
-      unique: true,
-      index: true,
-      admin: {
-        position: 'sidebar',
-        description: 'URL-friendly identifier (auto-generated)',
-      },
-      hooks: {
-        beforeValidate: [
-          async ({ data, operation, value, req, originalDoc }) => {
-            // If updating and slug hasn't changed, keep it
-            if (operation === 'update' && value && value === originalDoc?.slug) {
-              return value
-            }
-
-            if (!data?.title) return value
-
-            // Generate base slug from title
-            const baseSlug = data.title
-              .toLowerCase()
-              .replace(/ /g, '-')
-              .replace(/[^\w-]+/g, '')
-
-            // Generate a unique suffix (8 characters gives us ~3.4e14 possibilities)
-            // Using crypto.randomBytes for cryptographically strong randomness
-            const uniqueSuffix = generateUniqueSuffix(8)
-
-            // Combine the hierarchical slug with the unique suffix
-            // This ensures uniqueness while maintaining readability
-            const finalSlug = `${baseSlug}-${uniqueSuffix}`
-
-            return finalSlug
+          // SEO Tab
+          {
+            name: 'meta',
+            label: 'SEO',
+            fields: [
+              OverviewField({
+                titlePath: 'meta.title',
+                descriptionPath: 'meta.description',
+                imagePath: 'meta.image',
+              }),
+              MetaTitleField({ hasGenerateFn: true }),
+              MetaImageField({ relationTo: 'media' }),
+              MetaDescriptionField({}),
+              PreviewField({
+                hasGenerateFn: true,
+                titlePath: 'meta.title',
+                descriptionPath: 'meta.description',
+              }),
+            ],
           },
         ],
       },
-    },
 
-    {
-      name: 'totalSales',
-      type: 'number',
-      defaultValue: 0,
-      admin: {
-        readOnly: true,
-        position: 'sidebar',
+      // ── Sidebar: Pricing ─────────────────────────────────────
+      {
+        type: 'collapsible',
+        label: 'Pricing',
+        admin: { position: 'sidebar', initCollapsed: false },
+        fields: [
+          // Plugin's priceInNGN + priceInNGNEnabled (defaultValue: true)
+          ...pricingGroupFields,
+          // Sale fields
+          {
+            name: 'onSale',
+            type: 'checkbox',
+            defaultValue: false,
+          },
+          {
+            name: 'salePercentage',
+            type: 'number',
+            min: 1,
+            max: 90,
+            admin: {
+              condition: (data) => Boolean(data?.onSale),
+              description: 'Discount percentage (1–90%)',
+            },
+          },
+          {
+            name: 'salePriceInNGN',
+            type: 'number',
+            admin: {
+              readOnly: true,
+              description: 'Auto-calculated from price and discount percentage',
+            },
+          },
+        ],
       },
-    },
-  ],
-})
+
+      // ── Sidebar: Organization ────────────────────────────────
+      {
+        type: 'collapsible',
+        label: 'Organization',
+        admin: { position: 'sidebar' },
+        fields: [
+          {
+            name: 'categories',
+            type: 'relationship',
+            relationTo: 'categories',
+            hasMany: true,
+            required: true,
+          },
+          {
+            name: 'brand',
+            type: 'relationship',
+            relationTo: 'brands',
+            filterOptions: { isActive: { equals: true } },
+          },
+          {
+            name: 'gender',
+            type: 'select',
+            options: SITE_CONFIG.genderOptions,
+            defaultValue: SITE_CONFIG.singleGender || undefined,
+            admin: {
+              condition: () => !SITE_CONFIG.singleGender,
+            },
+          },
+        ],
+      },
+
+      // ── Sidebar: Slug ────────────────────────────────────────
+      {
+        name: 'slug',
+        type: 'text',
+        required: true,
+        unique: true,
+        index: true,
+        admin: {
+          position: 'sidebar',
+          description: 'Auto-generated from title',
+        },
+        hooks: {
+          beforeValidate: [
+            async ({ data, operation, value, originalDoc }) => {
+              if (operation === 'update' && value && value === originalDoc?.slug) return value
+              if (!data?.title) return value
+              const baseSlug = data.title
+                .toLowerCase()
+                .replace(/ /g, '-')
+                .replace(/[^\w-]+/g, '')
+              return `${baseSlug}-${generateUniqueSuffix(8)}`
+            },
+          ],
+        },
+      },
+
+      // ── Sidebar: Total Sales ─────────────────────────────────
+      {
+        name: 'totalSales',
+        type: 'number',
+        defaultValue: 0,
+        admin: {
+          readOnly: true,
+          position: 'sidebar',
+        },
+      },
+    ],
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+// import { CallToAction } from '@/blocks/CallToAction/config'
+// import { Content } from '@/blocks/Content/config'
+// import { MediaBlock } from '@/blocks/MediaBlock/config'
+// import { generatePreviewPath } from '@/utilities/generatePreviewPath'
+
+// import { generateUniqueSuffix } from '@/utilities/generateUniqueSuffix'
+// import { CollectionOverride } from '@payloadcms/plugin-ecommerce/types'
+// import { revalidatePath } from 'next/cache'
+
+// import {
+//   MetaDescriptionField,
+//   MetaImageField,
+//   MetaTitleField,
+//   OverviewField,
+//   PreviewField,
+// } from '@payloadcms/plugin-seo/fields'
+
+// import {
+//   FixedToolbarFeature,
+//   HeadingFeature,
+//   HorizontalRuleFeature,
+//   InlineToolbarFeature,
+//   lexicalEditor,
+// } from '@payloadcms/richtext-lexical'
+
+// import { DefaultDocumentIDType, Where } from 'payload'
+// import { SITE_CONFIG } from 'site.config'
+
+
+
+// export const ProductsCollection: CollectionOverride = ({ defaultCollection }) => ({
+//   ...defaultCollection,
+
+//   admin: {
+//     ...defaultCollection?.admin,
+//     useAsTitle: 'title',
+//     defaultColumns: ['title', 'priceInNGN', 'onSale', '_status'],
+//     livePreview: {
+//       url: ({ data, req }) =>
+//         generatePreviewPath({
+//           slug: data?.slug,
+//           collection: 'products',
+//           req,
+//         }),
+//     },
+//     preview: (data, { req }) =>
+//       generatePreviewPath({
+//         slug: data?.slug as string,
+//         collection: 'products',
+//         req,
+//       }),
+//   },
+
+//   defaultPopulate: {
+//     ...defaultCollection?.defaultPopulate,
+//     title: true,
+//     slug: true,
+//     gallery: true,
+//     priceInNGN: true,
+//     salePriceInNGN: true,
+//     inventory: true,
+//     categories: true,
+//     brand: true,
+//     gender: true,
+//     onSale:true
+//   },
+
+//   hooks: {
+//     beforeValidate: [
+//       ({ data }) => {
+//         if (!data) return data
+
+//         if (data.onSale && data.salePercentage && data.priceInNGN) {
+//           const discount = (data.salePercentage / 100) * data.priceInNGN
+//           data.salePriceInNGN = Math.round(data.priceInNGN - discount)
+//         } else {
+//           data.salePriceInNGN = null
+//         }
+
+//         return data
+//       },
+//     ],
+
+//     afterChange: [
+//       ({ doc, previousDoc, operation }) => {
+//         // Revalidate the specific product page
+//         if (operation === 'update') {
+//           revalidatePath(`/products/${doc.slug}`)
+//         }
+
+//         return doc
+//       },
+//     ],
+//   },
+
+//   fields: [
+//     // ========================
+//     // CORE
+//     // ========================
+//     {
+//       name: 'title',
+//       type: 'text',
+//       required: true,
+//     },
+
+//     // ========================
+//     // CONTENT TAB
+//     // ========================
+//     {
+//       type: 'tabs',
+//       tabs: [
+//         {
+//           label: 'Content',
+//           fields: [
+//             {
+//               name: 'description',
+//               type: 'richText',
+//               editor: lexicalEditor({
+//                 features: ({ rootFeatures }) => [
+//                   ...rootFeatures,
+//                   HeadingFeature({ enabledHeadingSizes: ['h1', 'h2', 'h3', 'h4'] }),
+//                   FixedToolbarFeature(),
+//                   InlineToolbarFeature(),
+//                   HorizontalRuleFeature(),
+//                 ],
+//               }),
+//             },
+//             {
+//               name: 'gallery',
+//               type: 'array',
+//               minRows: 1,
+//               fields: [
+//                 {
+//                   name: 'image',
+//                   type: 'upload',
+//                   relationTo: 'media',
+//                   required: true,
+//                 },
+
+//                 {
+//                   name: 'variantOption',
+//                   type: 'relationship',
+//                   relationTo: 'variantOptions',
+//                   admin: {
+//                     condition: (data) => {
+//                       return data?.enableVariants === true && data?.variantTypes?.length > 0
+//                     },
+//                   },
+//                   filterOptions: ({ data }) => {
+//                     if (data?.enableVariants && data?.variantTypes?.length) {
+//                       const variantTypeIDs = data.variantTypes.map((item: any) => {
+//                         if (typeof item === 'object' && item?.id) {
+//                           return item.id
+//                         }
+//                         return item
+//                       }) as DefaultDocumentIDType[]
+
+//                       if (variantTypeIDs.length === 0)
+//                         return {
+//                           variantType: {
+//                             in: [],
+//                           },
+//                         }
+
+//                       const query: Where = {
+//                         variantType: {
+//                           in: variantTypeIDs,
+//                         },
+//                       }
+
+//                       return query
+//                     }
+
+//                     return {
+//                       variantType: {
+//                         in: [],
+//                       },
+//                     }
+//                   },
+//                 },
+//               ],
+//             },
+//             {
+//               name: 'layout',
+//               type: 'blocks',
+//               blocks: [CallToAction, Content, MediaBlock],
+//             },
+//           ],
+//         },
+
+//         // ========================
+//         // VARIANTS TAB
+//         // ========================
+//         {
+//           label: 'Related Products',
+//           fields: [
+//             ...defaultCollection.fields,
+//             {
+//               name: 'relatedProducts',
+//               type: 'relationship',
+//               filterOptions: ({ id }) => {
+//                 if (id) {
+//                   return {
+//                     id: {
+//                       not_in: [id],
+//                     },
+//                   }
+//                 }
+
+//                 // ID comes back as undefined during seeding so we need to handle that case
+//                 return {
+//                   id: {
+//                     exists: true,
+//                   },
+//                 }
+//               },
+//               hasMany: true,
+//               relationTo: 'products',
+//             },
+//           ],
+//         },
+
+//         // ========================
+//         // SEO TAB
+//         // ========================
+//         {
+//           name: 'meta',
+//           label: 'SEO',
+//           fields: [
+//             OverviewField({
+//               titlePath: 'meta.title',
+//               descriptionPath: 'meta.description',
+//               imagePath: 'meta.image',
+//             }),
+//             MetaTitleField({ hasGenerateFn: true }),
+//             MetaImageField({ relationTo: 'media' }),
+//             MetaDescriptionField({}),
+//             PreviewField({
+//               hasGenerateFn: true,
+//               titlePath: 'meta.title',
+//               descriptionPath: 'meta.description',
+//             }),
+//           ],
+//         },
+//       ],
+//     },
+
+//     // ========================
+//     // SIDEBAR (COMMERCE CONTROL PANEL)
+//     // ========================
+
+//     {
+//       type: 'collapsible',
+//       label: 'Pricing',
+//       admin: { position: 'sidebar', initCollapsed: false },
+//       fields: [
+    
+//         {
+//           name: 'onSale',
+//           type: 'checkbox',
+//           defaultValue: false,
+//         },
+//         {
+//           name: 'salePercentage',
+//           type: 'number',
+//           min: 1,
+//           max: 90,
+//           admin: {
+//             condition: (data) => Boolean(data?.onSale),
+//           },
+//         },
+//         {
+//           name: 'salePriceInNGN',
+//           type: 'number',
+//           admin: { readOnly: true },
+//         },
+//       ],
+//     },
+
+//     {
+//       type: 'collapsible',
+//       label: 'Organization',
+//       admin: { position: 'sidebar' },
+//       fields: [
+//         {
+//           name: 'categories',
+//           type: 'relationship',
+//           relationTo: 'categories',
+//           hasMany: true,
+//           required: true,
+//         },
+//         {
+//           name: 'brand',
+//           type: 'relationship',
+//           relationTo: 'brands',
+//           filterOptions: {
+//             isActive: { equals: true },
+//           },
+//         },
+//         {
+//           name: 'gender',
+//           type: 'select',
+//           options: SITE_CONFIG.genderOptions,
+//           defaultValue: SITE_CONFIG.singleGender || undefined,
+//           admin: {
+//             condition: () => !SITE_CONFIG.singleGender,
+//           },
+//         },
+//       ],
+//     },
+
+//     {
+//       name: 'slug',
+//       type: 'text',
+//       required: true,
+//       unique: true,
+//       index: true,
+//       admin: {
+//         position: 'sidebar',
+//         description: 'URL-friendly identifier (auto-generated)',
+//       },
+//       hooks: {
+//         beforeValidate: [
+//           async ({ data, operation, value, req, originalDoc }) => {
+//             // If updating and slug hasn't changed, keep it
+//             if (operation === 'update' && value && value === originalDoc?.slug) {
+//               return value
+//             }
+
+//             if (!data?.title) return value
+
+//             // Generate base slug from title
+//             const baseSlug = data.title
+//               .toLowerCase()
+//               .replace(/ /g, '-')
+//               .replace(/[^\w-]+/g, '')
+
+//             // Generate a unique suffix (8 characters gives us ~3.4e14 possibilities)
+//             // Using crypto.randomBytes for cryptographically strong randomness
+//             const uniqueSuffix = generateUniqueSuffix(8)
+
+//             // Combine the hierarchical slug with the unique suffix
+//             // This ensures uniqueness while maintaining readability
+//             const finalSlug = `${baseSlug}-${uniqueSuffix}`
+
+//             return finalSlug
+//           },
+//         ],
+//       },
+//     },
+
+//     {
+//       name: 'totalSales',
+//       type: 'number',
+//       defaultValue: 0,
+//       admin: {
+//         readOnly: true,
+//         position: 'sidebar',
+//       },
+//     },
+//   ],
+// })

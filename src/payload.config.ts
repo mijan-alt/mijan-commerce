@@ -8,6 +8,7 @@ import { Footer } from '@/globals/Footer'
 import { Header } from '@/globals/Header'
 import { nodemailerAdapter } from '@payloadcms/email-nodemailer'
 import { Settings } from '@/globals/Settings'
+import { s3Storage } from '@payloadcms/storage-s3'
 
 import {
   BoldFeature,

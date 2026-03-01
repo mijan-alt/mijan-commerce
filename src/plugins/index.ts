@@ -19,6 +19,7 @@ import { Page, Product } from '@/payload-types'
 import { getEffectivePrice } from '@/utilities/getEffectivePrice'
 import { getServerSideURL } from '@/utilities/getURL'
 import { defaultCountries } from '@payloadcms/plugin-ecommerce/client/react'
+import { s3Storage } from '@payloadcms/storage-s3'
 
 const generateTitle: GenerateTitle<Product | Page> = ({ doc }) => {
   return doc?.title ? `${doc.title} | Payload Ecommerce Template` : 'Payload Ecommerce Template'
@@ -217,6 +218,21 @@ export const plugins: Plugin[] = [
           ],
         },
       }),
+    },
+  }),
+  s3Storage({
+    collections: {
+       media:true
+    },
+    bucket: process.env.S3_BUCKET!,
+    config: {
+      credentials: {
+        accessKeyId: process.env.S3_ACCESS_KEY_ID || '',
+        secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || '',
+      },
+      region: 'auto',
+      endpoint: process.env.S3_API || '',
+      forcePathStyle: true,
     },
   }),
 ]

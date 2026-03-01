@@ -301,8 +301,6 @@ export interface Product {
     hasNextPage?: boolean;
     totalDocs?: number;
   };
-  priceInNGNEnabled?: boolean | null;
-  priceInNGN?: number | null;
   relatedProducts?: (string | Product)[] | null;
   meta?: {
     title?: string | null;
@@ -312,14 +310,22 @@ export interface Product {
     image?: (string | null) | Media;
     description?: string | null;
   };
+  priceInNGNEnabled?: boolean | null;
+  priceInNGN?: number | null;
   onSale?: boolean | null;
+  /**
+   * Discount percentage (1–90%)
+   */
   salePercentage?: number | null;
+  /**
+   * Auto-calculated from price and discount percentage
+   */
   salePriceInNGN?: number | null;
   categories: (string | Category)[];
   brand?: (string | null) | Brand;
   gender?: 'women' | null;
   /**
-   * URL-friendly identifier (auto-generated)
+   * Auto-generated from title
    */
   slug: string;
   totalSales?: number | null;
@@ -2216,8 +2222,6 @@ export interface ProductsSelect<T extends boolean = true> {
   enableVariants?: T;
   variantTypes?: T;
   variants?: T;
-  priceInNGNEnabled?: T;
-  priceInNGN?: T;
   relatedProducts?: T;
   meta?:
     | T
@@ -2226,6 +2230,8 @@ export interface ProductsSelect<T extends boolean = true> {
         image?: T;
         description?: T;
       };
+  priceInNGNEnabled?: T;
+  priceInNGN?: T;
   onSale?: T;
   salePercentage?: T;
   salePriceInNGN?: T;

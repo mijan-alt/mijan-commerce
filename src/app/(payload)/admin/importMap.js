@@ -23,6 +23,7 @@ import { VariantOptionsSelector as VariantOptionsSelector_b91672ccd6e8b071c11142
 import { PriceCell as PriceCell_e27bf7b8cc50640dcdd584767b8eac3c } from '@payloadcms/plugin-ecommerce/client'
 import { PriceInput as PriceInput_b91672ccd6e8b071c11142ab941fedfb } from '@payloadcms/plugin-ecommerce/rsc'
 import { NotificationButton as NotificationButton_30507f6223c6a455e943c9ba531c643a } from '@/components/NotificationButton'
+import { S3ClientUploadHandler as S3ClientUploadHandler_f97aa6c64367fa259c5bc0567239ef24 } from '@payloadcms/storage-s3/client'
 import { default as default_c2090caa589d0cb4bee268720f01f9ab } from '@/components/dashboard/TodaysRevenue'
 import { default as default_6c934fafab6eacbe74fcaa00ef0f481d } from '@/components/dashboard/TotalCustomers'
 import { default as default_5186dd92b41651feffb97da6f5bc6aa4 } from '@/components/dashboard/TotalProducts'
@@ -54,6 +55,7 @@ export const importMap = {
   "@payloadcms/plugin-ecommerce/client#PriceCell": PriceCell_e27bf7b8cc50640dcdd584767b8eac3c,
   "@payloadcms/plugin-ecommerce/rsc#PriceInput": PriceInput_b91672ccd6e8b071c11142ab941fedfb,
   "@/components/NotificationButton#NotificationButton": NotificationButton_30507f6223c6a455e943c9ba531c643a,
+  "@payloadcms/storage-s3/client#S3ClientUploadHandler": S3ClientUploadHandler_f97aa6c64367fa259c5bc0567239ef24,
   "@/components/dashboard/TodaysRevenue#default": default_c2090caa589d0cb4bee268720f01f9ab,
   "@/components/dashboard/TotalCustomers#default": default_6c934fafab6eacbe74fcaa00ef0f481d,
   "@/components/dashboard/TotalProducts#default": default_5186dd92b41651feffb97da6f5bc6aa4,

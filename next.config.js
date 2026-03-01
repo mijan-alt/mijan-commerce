@@ -8,14 +8,21 @@ const NEXT_PUBLIC_SERVER_URL = process.env.NEXT_PUBLIC_SERVER_URL || 'http://loc
 const nextConfig = {
   images: {
     remotePatterns: [
-      ...[NEXT_PUBLIC_SERVER_URL /* 'https://example.com' */].map((item) => {
-        const url = new URL(item)
+      // Server URL
+      {
+        protocol: 'https',
+        hostname: new URL(NEXT_PUBLIC_SERVER_URL).hostname,
+      },
+      // Cloudflare R2
+      {
+        protocol: 'https',
+        hostname: process.env.R2_DOMAIN|| '',
+      },
 
-        return {
-          hostname: url.hostname,
-          protocol: url.protocol.replace(':', ''),
-        }
-      }),
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+      },
     ],
   },
   reactStrictMode: true,

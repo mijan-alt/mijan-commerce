@@ -228,13 +228,13 @@ export const initiatePayment = (props: {
           email: customerEmail,
           amount: amountInKobo,
           currency: 'NGN',
-          callback_url: `${process.env.PAYLOAD_PUBLIC_SERVER_URL}/api/payments/paystack/callback`,
+          callback_url: `${process.env.NEXT_PUBLIC_SERVER_URL}/api/payments/paystack/callback`,
           metadata: {
             cartID: cart.id,
             cartItemsSnapshot: JSON.stringify(flattenedCart),
             shippingAddress: shippingAddressAsString,
             billingAddress: billingAddressAsString,
-            cancel_action: `${process.env.PAYLOAD_PUBLIC_SERVER_URL}/checkout`
+            cancel_action: `${process.env.NEXT_PUBLIC_SERVER_URL}/checkout`
           },
           channels: ['card', 'bank', 'ussd', 'qr', 'mobile_money', 'bank_transfer']
         },

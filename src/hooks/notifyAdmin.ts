@@ -7,7 +7,7 @@ export const notifyAdminOrder: CollectionAfterChangeHook = async ({ doc, operati
 
   const payload = req.payload
 
-  const adminURL = `${process.env.PAYLOAD_PUBLIC_SERVER_URL}/admin/collections/orders/${doc.id}`
+  const adminURL = `${process.env.NEXT_PUBLIC_SERVER_URL}/admin/collections/orders/${doc.id}`
 
   const fullName = `${doc.shippingAddress.firstName} ${doc.shippingAddress.lastName}`
 
@@ -21,10 +21,10 @@ export const notifyAdminOrder: CollectionAfterChangeHook = async ({ doc, operati
 
   const itemsList = doc.items
     ?.map(
-      (item: any) => `• ${item.product?.title || item.title} x${item.quantity} - ₦${item.product.priceInNGN}`,
+      (item: any) =>
+        `• ${item.product?.title || item.title} x${item.quantity} - ₦${item.product.priceInNGN}`,
     )
     .join('\n')
-
 
   /*
    =========================

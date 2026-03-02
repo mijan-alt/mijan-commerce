@@ -105,7 +105,7 @@ export const plugins: Plugin[] = [
           secretKey: process.env.PAYSTACK_SECRET_KEY!,
           publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY!,
           // webhookSecret: process.env.PAYSTACK_WEBHOOK_SECRET,
-          baseUrl: `${process.env.PAYLOAD_PUBLIC_SERVER_URL}`,
+          baseUrl: `${process.env.NEXT_PUBLIC_SERVER_URL}`,
           paystackUrl: 'https://api.paystack.co',
           webhooks: {
             'charge.success': async ({ event, req }) => {
@@ -222,7 +222,7 @@ export const plugins: Plugin[] = [
   }),
   s3Storage({
     collections: {
-       media:true
+      media: true,
     },
     bucket: process.env.S3_BUCKET!,
     config: {

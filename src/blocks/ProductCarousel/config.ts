@@ -9,6 +9,8 @@ export const ProductCarousel: Block = {
     plural: 'Product Carousels',
     singular: 'Product Carousel',
   },
+
+  
   fields: [
     {
       name: 'showHeader',

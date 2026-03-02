@@ -1,4 +1,5 @@
 import { randomBytes } from 'crypto'
+import { revalidatePath } from 'next/cache'
 import { type CollectionConfig } from 'payload'
 import { SITE_CONFIG } from 'site.config'
 
@@ -8,6 +9,19 @@ export const Categories: CollectionConfig = {
     useAsTitle: 'title',
     defaultColumns: ['title', 'slug', 'parent'],
     group: 'Ecommerce',
+  },
+
+  hooks: {
+    afterChange: [
+      () => {
+        revalidatePath('/')
+      },
+    ],
+    afterDelete: [
+      () => {
+        revalidatePath('/')
+      },
+    ],
   },
 
   fields: [
